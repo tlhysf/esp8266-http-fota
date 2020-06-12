@@ -10,7 +10,7 @@ int led2Pin = 6;
 int led1Pin = 5;
 Adafruit_MCP23017 mcp;
 
-const String FirmwareVer = {"1.0"};
+const String FirmwareVer = {"1.1"};
 #define URL_fw_Version  "https://raw.githubusercontent.com/tlhysf/esp8266-http-fota/master/firmware/version.txt"
 #define URL_fw_Bin      "https://raw.githubusercontent.com/tlhysf/esp8266-http-fota/master/firmware/firmware.ino.nodemcu.bin"
 
@@ -88,7 +88,7 @@ void FirmwareUpdate()
 }
 
 unsigned long previousMillis = 0;
-const long interval = 30000;
+const long interval = 10000;
 
 void repeatedCall() {
   unsigned long currentMillis = millis();
@@ -126,9 +126,9 @@ void setup()
 
 void loop()
 {
-  mcp.digitalWrite(led2Pin, 1);
+  mcp.digitalWrite(led3Pin, 1);
   delay(200); 
-  mcp.digitalWrite(led2Pin, 0);
+  mcp.digitalWrite(led3Pin, 0);
   delay(200); 
   
   repeatedCall();
