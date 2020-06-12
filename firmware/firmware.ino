@@ -10,90 +10,95 @@ int led2Pin = 6;
 int led1Pin = 5;
 Adafruit_MCP23017 mcp;
 
-const String FirmwareVer={"1.0"}; 
-#define URL_fw_Version "https://raw.githubusercontent.com/programmer131/otaFiles/master/version.txt"
-#define URL_fw_Bin "https://raw.githubusercontent.com/programmer131/otaFiles/master/firmware.bin"
+const String FirmwareVer = {"1.0"};
+#define URL_fw_Version  "https://raw.githubusercontent.com/tlhysf/esp8266-http-fota/master/firmware/version.txt"
+#define URL_fw_Bin      "https://raw.githubusercontent.com/tlhysf/esp8266-http-fota/master/firmware/firmware.ino.nodemcu.bin"
 
-//#define URL_fw_Version "http://cade-make.000webhostapp.com/version.txt"
-//#define URL_fw_Bin "http://cade-make.000webhostapp.com/firmware.bin"
+#define URL_fw_Version_Fingerprint "70 94 DE DD E6 C4 69 48 3A 92 70 A1 48 56 78 2D 18 64 E0 B7"
+#define URL_fw_Bin_Fingerprint "70 94 DE DD E6 C4 69 48 3A 92 70 A1 48 56 78 2D 18 64 E0 B7"
+
 HTTPClient http;
- 
-const char* ssid = "HOME_PTCL";
+
+const char* ssid = "HOME-PTCL";
 const char* password = "broadband#672";
- 
+
 void FirmwareUpdate()
 {
-  http.begin(URL_fw_Version,"CC AA 48 48 66 46 0E 91 53 2C 9C 7C 23 2A B1 74 4D 29 9D 33");     // check version URL
+  http.begin(URL_fw_Version, URL_fw_Version_Fingerprint);
   delay(100);
-  int httpCode = http.GET();            // get data from version file
+
+  // get data from version file
+  int httpCode = http.GET();
   delay(100);
   String payload;
-  if (httpCode == HTTP_CODE_OK)         // if version received
+
+  // if version received
+  if (httpCode == HTTP_CODE_OK)
   {
-    payload = http.getString();  // save received version
-    Serial.println(payload );
+    // save received version
+    payload = http.getString();
+    Serial.println(payload);
   }
   else
   {
-    Serial.print("error in downloading version file:");
+    Serial.print("Error in downloading version file: ");
     Serial.println(httpCode);
-
   }
-  
+
   http.end();
-  if (httpCode == HTTP_CODE_OK)         // if version received
+
+  // if version received
+  if (httpCode == HTTP_CODE_OK)         
   {
-  if(payload.equals(FirmwareVer) )
-  {   
-     Serial.println("Device already on latest firmware version"); 
+    if (payload.equals(FirmwareVer))
+    {
+      Serial.println("Device already on latest firmware version.");
+    }
+    else
+    {
+      Serial.println("New firmware detected.");
+      WiFiClient client;
+
+      // The line below is optional. It can be used to blink the LED on the board during flashing
+      // The LED will be on during download of one buffer of data from the network. The LED will
+      // be off during writing that buffer to flash
+      // On a good connection the LED should flash regularly. On a bad connection the LED will be
+      // on much longer than it will be off. Other pins than LED_BUILTIN may be used. The second
+      // value is used to put the LED on. If the LED is on with HIGH, that value should be passed
+      // ESPhttpUpdate.setLedPin(LED_BUILTIN, LOW);
+      mcp.digitalWrite(led1Pin, 1);
+
+      t_httpUpdate_return ret = ESPhttpUpdate.update(URL_fw_Bin, "", URL_fw_Bin_Fingerprint);
+
+      switch (ret) {
+        case HTTP_UPDATE_FAILED:
+          Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+          break;
+
+        case HTTP_UPDATE_NO_UPDATES:
+          Serial.println("HTTP_UPDATE_NO_UPDATES");
+          break;
+
+        case HTTP_UPDATE_OK:
+          Serial.println("HTTP_UPDATE_OK");
+          break;
+      }
+    }
   }
-  else
-  {
-     Serial.println("New firmware detected");
-     WiFiClient client;
-
-    // The line below is optional. It can be used to blink the LED on the board during flashing
-    // The LED will be on during download of one buffer of data from the network. The LED will
-    // be off during writing that buffer to flash
-    // On a good connection the LED should flash regularly. On a bad connection the LED will be
-    // on much longer than it will be off. Other pins than LED_BUILTIN may be used. The second
-    // value is used to put the LED on. If the LED is on with HIGH, that value should be passed
-    ESPhttpUpdate.setLedPin(LED_BUILTIN, LOW);
-
-
-    t_httpUpdate_return ret = ESPhttpUpdate.update(URL_fw_Bin,"","CC AA 48 48 66 46 0E 91 53 2C 9C 7C 23 2A B1 74 4D 29 9D 33");
-    
-    switch (ret) {
-      case HTTP_UPDATE_FAILED:
-        Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
-        break;
-
-      case HTTP_UPDATE_NO_UPDATES:
-        Serial.println("HTTP_UPDATE_NO_UPDATES");
-        break;
-
-      case HTTP_UPDATE_OK:
-        Serial.println("HTTP_UPDATE_OK");
-        break;
-    } 
-  }
- }  
 }
 
-unsigned long previousMillis = 0;        
+unsigned long previousMillis = 0;
 const long interval = 30000;
 
- void repeatedCall(){
-    unsigned long currentMillis = millis();
-    if ((currentMillis - previousMillis) >= interval) 
-    {
-      // save the last time you blinked the LED
-      previousMillis = currentMillis;
-      FirmwareUpdate();
-    }
- }
+void repeatedCall() {
+  unsigned long currentMillis = millis();
+  if ((currentMillis - previousMillis) >= interval)
+  {
+    previousMillis = currentMillis;
+    FirmwareUpdate();
+  }
+}
 
-  
 void setup()
 {
   Serial.begin(115200);
@@ -104,16 +109,27 @@ void setup()
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(500);
-    Serial.print("O");
-  }                                   
+    Serial.print("* ");
+  }
   Serial.println("Connected to WiFi");
   pinMode(LED_BUILTIN, OUTPUT);
+
+  Wire.begin();
+  mcp.begin();
+  mcp.pinMode(led1Pin, OUTPUT);
+  mcp.pinMode(led2Pin, OUTPUT);
+  mcp.pinMode(led3Pin, OUTPUT);
+  mcp.digitalWrite(led1Pin, 0);
+  mcp.digitalWrite(led2Pin, 0);
+  mcp.digitalWrite(led3Pin, 0);
 }
+
 void loop()
 {
-  digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-  delay(1000);                       // wait for a second
-  digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
-  delay(1000);                       // wait for a second
-  repeatedCall();    
+  mcp.digitalWrite(led2Pin, 1);
+  delay(200); 
+  mcp.digitalWrite(led2Pin, 0);
+  delay(200); 
+  
+  repeatedCall();
 }
